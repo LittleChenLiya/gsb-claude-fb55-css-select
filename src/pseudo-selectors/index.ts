@@ -16,6 +16,7 @@
 import { type PseudoSelector, parse } from "css-what";
 import type { CompiledQuery, CompileToken, InternalOptions } from "../types.js";
 import { aliases } from "./aliases.js";
+import { compilePseudoExtension } from "./extensions.js";
 import { filters } from "./filters.js";
 import { pseudos, verifyPseudoArguments } from "./pseudos.js";
 import { subselects } from "./subselects.js";
@@ -36,13 +37,38 @@ export function compilePseudoSelector<Node, ElementNode extends Node>(
     compileToken: CompileToken<Node, ElementNode>,
 ): CompiledQuery<ElementNode> {
     const { name, data } = selector;
+    const extension = options.pseudoExtensions?.[name];
 
     if (Array.isArray(data)) {
+        if (extension) {
+            return compilePseudoExtension(
+                next,
+                name,
+                extension,
+                data,
+                options,
+                context,
+                compileToken,
+            );
+        }
+
         if (!(name in subselects)) {
             throw new Error(`Unknown pseudo-class :${name}(${data})`);
         }
 
         return subselects[name](next, data, options, context, compileToken);
+    }
+
+    if (extension) {
+        return compilePseudoExtension(
+            next,
+            name,
+            extension,
+            data,
+            options,
+            context,
+            compileToken,
+        );
     }
 
     const userPseudo = options.pseudos?.[name];

@@ -154,6 +154,52 @@ All options are optional.
   document can change in between queries with the same compiled selector.
   Default: `true`.
 - `pseudos`: A map of pseudo-class names to functions or strings.
+- `pseudoExtensions`: A map of pseudo-class names to explicitly registered
+  extensions. Each extension declares up-front whether its argument is
+  required (`argument: "none" | "optional" | "required"`), the argument type
+  (`argumentType: "string" | "selector"`), and whether it is pure
+  (`pure: true`), which allows its results to be cached. Declarations are
+  validated at compile time — before any element is matched — and compilation
+  never accesses the DOM or runs the extension's `match` function. Unknown
+  pseudo-classes are rejected, and replacing a built-in pseudo-class or a
+  legacy `pseudos` entry requires `override: true` on the extension. Nested
+  `:not()` / `:has()` arguments (and `argumentType: "selector"` arguments)
+  are still parsed by css-select's own parser. Example:
+
+  ```js
+  const options = {
+      pseudoExtensions: {
+          // A pure extension with a required string argument.
+          "min-text-length": {
+              argument: "required",
+              argumentType: "string",
+              pure: true,
+              match: (element, argument, options) =>
+                  options.adapter.getText(element).trim().length >=
+                  Number(argument),
+          },
+          // An extension whose argument is a nested selector.
+          "parent-is": {
+              argument: "required",
+              argumentType: "selector",
+              match: (element, argument, options) => {
+                  const parent = options.adapter.getParent(element);
+                  return (
+                      parent != null &&
+                      options.adapter.isTag(parent) &&
+                      argument(parent)
+                  );
+              },
+          },
+      },
+  };
+
+  CSSselect.selectAll("p:min-text-length(10)", document, options);
+  CSSselect.selectAll("p:parent-is(article)", document, options);
+  ```
+
+  See [`examples/pseudo-extensions.mjs`](examples/pseudo-extensions.mjs) for a
+  runnable version (`npm run example:pseudo-extensions`).
 
 #### Custom Adapters
 

@@ -8,6 +8,10 @@ import { isTag } from "domhandler";
 import * as DomUtils from "domutils";
 import { compileToken } from "./compile.js";
 import { findAll, findOne, getNextSiblings } from "./helpers/querying.js";
+import {
+    validatePseudoExtensions,
+    validateSelectorExtensions,
+} from "./pseudo-selectors/extensions.js";
 import type {
     Adapter,
     CompiledQuery,
@@ -36,7 +40,15 @@ function convertOptionFormats<Node, ElementNode extends Node>(
     // @ts-expect-error `equals` does not exist on `Options`
     finalOptions.equals ??= finalOptions.adapter?.equals ?? defaultEquals;
 
-    return finalOptions as InternalOptions<Node, ElementNode>;
+    const internalOptions = finalOptions as InternalOptions<
+        Node,
+        ElementNode
+    >;
+
+    // Reject malformed extension declarations and unauthorized overrides early.
+    validatePseudoExtensions(internalOptions);
+
+    return internalOptions;
 }
 
 /**
@@ -72,9 +84,22 @@ export function _compileUnsafe<Node, ElementNode extends Node>(
     options?: Options<Node, ElementNode>,
     context?: Node[] | Node,
 ): CompiledQuery<ElementNode> {
+    const convertedOptions = convertOptionFormats(options);
+
+    if (typeof selector === "string") {
+        const token = parse(selector);
+        // Validate extensions up-front so errors carry the source position.
+        validateSelectorExtensions(token, convertedOptions, selector);
+        return compileToken<Node, ElementNode>(
+            token,
+            convertedOptions,
+            context,
+        );
+    }
+
     return compileToken<Node, ElementNode>(
-        typeof selector === "string" ? parse(selector) : selector,
-        convertOptionFormats(options),
+        selector,
+        convertedOptions,
         context,
     );
 }
@@ -223,4 +248,9 @@ export function is<Node, ElementNode extends Node>(
  */
 export default selectAll;
 
-export type { Options } from "./types.js";
+export type {
+    Options,
+    PseudoExtension,
+    PseudoExtensionArgument,
+    PseudoExtensionArgumentType,
+} from "./types.js";

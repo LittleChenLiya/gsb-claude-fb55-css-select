@@ -53,6 +53,7 @@
     },
     "scripts": {
         "build": "tsc",
+        "example:pseudo-extensions": "npm run build && node examples/pseudo-extensions.mjs",
         "format": "npm run format:es && npm run format:biome",
         "format:biome": "biome check --write .",
         "format:es": "npm run lint:es -- --fix",

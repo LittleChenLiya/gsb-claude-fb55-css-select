@@ -94,6 +94,66 @@ export interface Adapter<Node, ElementNode extends Node> {
 }
 
 /**
+ * Whether a pseudo-class extension takes an argument.
+ */
+export type PseudoExtensionArgument = "none" | "optional" | "required";
+
+/**
+ * The type of argument a pseudo-class extension accepts.
+ *
+ * - `"string"`: The raw argument text is passed to the matcher.
+ * - `"selector"`: The argument is parsed as a selector list by css-select's
+ *   parser and the compiled matcher is passed to the extension.
+ */
+export type PseudoExtensionArgumentType = "string" | "selector";
+
+/**
+ * An explicitly registered pseudo-class extension.
+ *
+ * Extensions declare up-front whether their argument is required, which type
+ * it has, and whether their results may be cached. Declarations are checked
+ * at compile time — before any element is matched — and compilation never
+ * accesses the DOM or runs the `match` function.
+ */
+export interface PseudoExtension<Node, ElementNode extends Node> {
+    /**
+     * Whether the pseudo-class takes an argument.
+     * @default "none" (`"required"` when `argumentType` is `"selector"`)
+     */
+    argument?: PseudoExtensionArgument;
+    /**
+     * The type of the argument.
+     * @default "string"
+     */
+    argumentType?: PseudoExtensionArgumentType;
+    /**
+     * Whether the extension is pure, meaning its result only depends on the
+     * element and the argument. Only pure extensions have their results
+     * cached.
+     * @default false
+     */
+    pure?: boolean;
+    /**
+     * Must be set to `true` to replace a built-in pseudo-class or a legacy
+     * `pseudos` entry with the same name.
+     * @default false
+     */
+    override?: boolean;
+    /**
+     * The matcher. Only called while querying — never during compilation.
+     * @param element The element to test.
+     * @param argument The argument: a string for `argumentType: "string"`,
+     * a compiled query for `argumentType: "selector"`, or `null`.
+     * @param options The normalized options, including the DOM adapter.
+     */
+    match: (
+        element: ElementNode,
+        argument: string | CompiledQuery<ElementNode> | null,
+        options: InternalOptions<Node, ElementNode>,
+    ) => boolean;
+}
+
+/**
  * Public query options for css-select.
  */
 export interface Options<Node, ElementNode extends Node> {
@@ -133,6 +193,21 @@ export interface Options<Node, ElementNode extends Node> {
               | string
               | ((element: ElementNode, value?: string | null) => boolean)
           >
+        | undefined;
+    /**
+     * Explicitly registered pseudo-class extensions.
+     *
+     * Each extension declares whether its argument is required, the argument
+     * type, and whether it is pure (cacheable). Declarations are validated at
+     * compile time — before any matching happens — and unknown or
+     * unauthorized pseudo-classes are rejected. Compilation never touches the
+     * DOM or runs the extension's `match` function.
+     *
+     * Replacing a built-in pseudo-class or a legacy `pseudos` entry with the
+     * same name requires `override: true` on the extension.
+     */
+    pseudoExtensions?:
+        | Record<string, PseudoExtension<Node, ElementNode>>
         | undefined;
     /**
      * The last function in the stack, will be called with the last element
