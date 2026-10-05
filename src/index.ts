@@ -223,4 +223,10 @@ export function is<Node, ElementNode extends Node>(
  */
 export default selectAll;
 
-export type { Options } from "./types.js";
+export {
+    type PseudoExtensionArgumentType,
+    type RegisterPseudoOptions,
+    registerPseudo,
+    unregisterPseudo,
+} from "./pseudo-selectors/extensions.js";
+export type { Options, PseudoExtension } from "./types.js";

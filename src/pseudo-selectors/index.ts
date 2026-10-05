@@ -16,6 +16,11 @@
 import { type PseudoSelector, parse } from "css-what";
 import type { CompiledQuery, CompileToken, InternalOptions } from "../types.js";
 import { aliases } from "./aliases.js";
+import {
+    compileExtension,
+    getRegisteredPseudo,
+    type PseudoExtension,
+} from "./extensions.js";
 import { filters } from "./filters.js";
 import { pseudos, verifyPseudoArguments } from "./pseudos.js";
 import { subselects } from "./subselects.js";
@@ -64,6 +69,17 @@ export function compilePseudoSelector<Node, ElementNode extends Node>(
         verifyPseudoArguments(userPseudo, name, data, 1);
 
         return (element) => userPseudo(element, data) && next(element);
+    }
+
+    const extension = getRegisteredPseudo(name);
+
+    if (extension) {
+        return compileExtension(
+            next,
+            selector,
+            extension as PseudoExtension<Node, ElementNode>,
+            options,
+        );
     }
 
     if (name in filters) {

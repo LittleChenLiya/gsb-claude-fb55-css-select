@@ -155,6 +155,59 @@ All options are optional.
   Default: `true`.
 - `pseudos`: A map of pseudo-class names to functions or strings.
 
+#### Registering custom pseudo-classes
+
+For explicit, compile-time checked pseudo-class extensions, use
+`registerPseudo`. The declaration states whether an argument is required, its
+type, and whether the extension is pure:
+
+```js
+import * as CSSselect from "css-select";
+
+CSSselect.registerPseudo({
+    name: "starts-with",
+    // Whether an argument is required. Compiling `:starts-with` without one
+    // throws at compile time, before any query is run.
+    required: true,
+    // Argument type: "string" (the default) passes the raw argument;
+    // "selector" parses the argument with css-what at compile time.
+    argument: "string",
+    // Whether the extension is pure (its result only depends on the element
+    // and the argument). Pure extensions have their per-element results
+    // cached.
+    cacheable: true,
+    // Called when a compiled selector is executed against an element. Never
+    // called during compilation.
+    match(element, data, options) {
+        return getText(element).startsWith(data);
+    },
+});
+```
+
+- Missing required arguments and argument type mismatches are reported at
+  compile time, not when the matcher is run.
+- Unknown pseudo-classes are still rejected at compile time.
+- Registering a pseudo-class with the same name as a built-in or a previously
+  registered extension throws unless `{ override: true }` is passed:
+
+```js
+CSSselect.registerPseudo(
+    { name: "starts-with", match: () => false },
+    { override: true },
+);
+```
+
+- The matcher is never called during compilation, and compilation never
+  accesses the DOM.
+- Nested `:not(...)` and `:has(...)` arguments are still parsed by css-what, so
+  custom pseudo-classes work inside them and are checked the same way.
+
+The old `pseudos` option (a map of names to functions or selector strings)
+continues to work as before.
+
+See [`examples/custom-pseudos.mjs`](examples/custom-pseudos.mjs) for a runnable
+example (`npm run build && node examples/custom-pseudos.mjs`).
+
 #### Custom Adapters
 
 A custom adapter must match the

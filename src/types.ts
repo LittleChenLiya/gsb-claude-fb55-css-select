@@ -94,6 +94,66 @@ export interface Adapter<Node, ElementNode extends Node> {
 }
 
 /**
+ * Argument type declared by a {@link PseudoExtension}.
+ *
+ * - `"string"`: the raw argument string is passed to the matcher.
+ * - `"selector"`: the argument is parsed as a selector list (css-what) and the
+ *   parsed tokens are passed to the matcher.
+ */
+export type PseudoExtensionArgumentType = "string" | "selector";
+
+/**
+ * A user-defined pseudo-class registered explicitly via `registerPseudo`.
+ *
+ * The declaration states whether an argument is required, its type, and
+ * whether the extension is pure (its result only depends on the element and
+ * the argument). Compilation checks the declaration and never calls the
+ * matcher.
+ */
+export interface PseudoExtension<Node, ElementNode extends Node> {
+    /** Name of the pseudo-class, without the leading colon. */
+    name: string;
+
+    /**
+     * Whether an argument is required. When `true`, compiling a selector with
+     * `:name` and no argument throws at compile time. Defaults to `false`.
+     */
+    required?: boolean;
+
+    /**
+     * Type of the argument.
+     *
+     * - `"string"` (the default): the raw argument string is passed to
+     *   `match`.
+     * - `"selector"`: the argument is parsed as a selector list by css-what at
+     *   compile time; the parsed tokens are passed to `match`. Parse errors
+     *   are reported at compile time.
+     */
+    argument?: PseudoExtensionArgumentType;
+
+    /**
+     * Whether the extension is pure: its result only depends on the element
+     * and the argument and never changes. Pure extensions have their
+     * per-element results cached. Defaults to `false`.
+     */
+    cacheable?: boolean;
+
+    /**
+     * Called when a compiled selector is executed against an element. Never
+     * called during compilation.
+     * @param element The element to match.
+     * @param data The parsed argument, or `null` if no argument was given.
+     * @param options The normalized options used for compilation.
+     * @returns Whether the element matches.
+     */
+    match: (
+        element: ElementNode,
+        data: string | Selector[][] | null,
+        options: InternalOptions<Node, ElementNode>,
+    ) => boolean;
+}
+
+/**
  * Public query options for css-select.
  */
 export interface Options<Node, ElementNode extends Node> {

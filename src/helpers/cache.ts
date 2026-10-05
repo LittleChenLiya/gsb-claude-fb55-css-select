@@ -60,3 +60,37 @@ export function cacheParentResults<Node, ElementNode extends Node>(
         return resultCache.get(node) ? addResultToCache(element) : false;
     };
 }
+
+/**
+ * Wrap a per-element predicate so its boolean result is cached per element.
+ *
+ * Used for pure pseudo-class extensions, whose result only depends on the
+ * element and the (compile-time) argument, so the matcher only needs to run
+ * once per element per compiled query.
+ * @param next Matcher to run before checking the cache.
+ * @param options Configuration object for cache behavior.
+ * @param options.cacheResults Whether results should be memoized per element.
+ * @param matches Predicate to memoize.
+ */
+export function cacheResult<Node, ElementNode extends Node>(
+    next: CompiledQuery<ElementNode>,
+    { cacheResults }: InternalOptions<Node, ElementNode>,
+    matches: (element: ElementNode) => boolean,
+): CompiledQuery<ElementNode> {
+    if (cacheResults === false || typeof WeakMap === "undefined") {
+        return (element) => next(element) && matches(element);
+    }
+
+    // @ts-expect-error `ElementNode` is not extending object
+    const resultCache = new WeakMap<ElementNode, boolean>();
+
+    return function cachedResult(element: ElementNode): boolean {
+        if (resultCache.has(element)) {
+            return resultCache.get(element) ?? false;
+        }
+
+        const result = next(element) && matches(element);
+        resultCache.set(element, result);
+        return result;
+    };
+}
