@@ -1,4 +1,5 @@
 import type { Selector } from "css-what";
+import type { Generation } from "./helpers/generation.js";
 
 /**
  * Selector token used internally by css-select.
@@ -169,6 +170,16 @@ export interface Options<Node, ElementNode extends Node> {
      * @default true
      */
     cacheResults?: boolean;
+    /**
+     * An explicit generation tracker. When provided, cached results are
+     * invalidated whenever the generation advances. The caller is
+     * responsible for advancing the generation when the DOM changes.
+     *
+     * This does not add any automatic change listeners or in-flight
+     * snapshots; the caller explicitly controls when the generation
+     * advances.
+     */
+    generation?: Generation;
 }
 
 // Internally, we want to ensure that no propterties are accessed on the passed objects

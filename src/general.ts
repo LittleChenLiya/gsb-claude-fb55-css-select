@@ -9,6 +9,11 @@ import type {
     InternalSelector,
 } from "./types.js";
 
+interface CacheEntry {
+    version: number;
+    matches: boolean;
+}
+
 /*
  * All available rules
  */
@@ -104,17 +109,24 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
             const resultCache = new WeakMap<
                 // @ts-expect-error `ElementNode` is not extending object
                 ElementNode,
-                { matches: boolean }
+                CacheEntry
             >();
             return function cachedDescendant(element: ElementNode): boolean {
+                const currentVersion = options.generation?.version ?? 0;
                 let current: ElementNode | null = element;
-                let result: { matches: boolean } | undefined;
+                let result: CacheEntry | undefined;
 
                 while ((current = getElementParent(current, adapter))) {
                     const cached = resultCache.get(current);
 
-                    if (cached === undefined) {
-                        result ??= { matches: false };
+                    if (
+                        cached === undefined ||
+                        cached.version !== currentVersion
+                    ) {
+                        result ??= {
+                            version: currentVersion,
+                            matches: false,
+                        };
                         result.matches = next(current);
                         resultCache.set(current, result);
                         if (result.matches) {

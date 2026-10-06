@@ -223,4 +223,5 @@ export function is<Node, ElementNode extends Node>(
  */
 export default selectAll;
 
+export { Generation } from "./helpers/generation.js";
 export type { Options } from "./types.js";
