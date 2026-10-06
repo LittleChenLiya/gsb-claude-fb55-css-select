@@ -94,6 +94,27 @@ export interface Adapter<Node, ElementNode extends Node> {
 }
 
 /**
+ * Explicit, generation-bound cache for memoized selector results.
+ *
+ * Results cached while a DOM generation is active (such as `:has()` matches
+ * that depend on descendants) become stale once the caller advances the
+ * generation after mutating the DOM. The cache does not observe the DOM; the
+ * caller is responsible for advancing the generation.
+ */
+export interface ResultCacheLike {
+    /**
+     * The current DOM generation. Monotonically increasing; a new value means
+     * previously memoized results must not be reused.
+     */
+    getGeneration(): number;
+    /**
+     * Mark the current DOM generation as finished, invalidating all results
+     * memoized for previous generations.
+     */
+    advanceGeneration(): void;
+}
+
+/**
  * Public query options for css-select.
  */
 export interface Options<Node, ElementNode extends Node> {
@@ -166,9 +187,24 @@ export interface Options<Node, ElementNode extends Node> {
      * Allow css-select to cache results for some selectors, sometimes greatly
      * improving querying performance. Disable this if your document can
      * change in between queries with the same compiled selector.
+     *
+     * When a {@link ResultCacheLike} is provided via `resultCache`, cached
+     * results that depend on mutable DOM state (such as `:has()`) are bound
+     * to the cache's current generation; advance that generation after
+     * mutating the DOM to force a re-evaluation.
      * @default true
      */
     cacheResults?: boolean;
+    /**
+     * Explicit generation cache. When supplied, memoized results are tagged
+     * with the cache's current generation and with the active adapter; stale
+     * generations (after {@link ResultCacheLike.advanceGeneration}) and
+     * mismatching adapters never reuse previous results.
+     *
+     * The cache is keyed by DOM node, so results are not shared between
+     * separate DOM trees. It does not snapshot queries or observe the DOM.
+     */
+    resultCache?: ResultCacheLike;
 }
 
 // Internally, we want to ensure that no propterties are accessed on the passed objects

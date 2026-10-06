@@ -223,4 +223,5 @@ export function is<Node, ElementNode extends Node>(
  */
 export default selectAll;
 
-export type { Options } from "./types.js";
+export { ResultCache } from "./helpers/cache.js";
+export type { Options, ResultCacheLike } from "./types.js";
