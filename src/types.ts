@@ -187,6 +187,11 @@ export interface InternalOptions<Node, ElementNode extends Node>
 export interface CompiledQuery<ElementNode> {
     (node: ElementNode): boolean;
     shouldTestNextSiblings?: boolean;
+    /**
+     * Whether the query root itself should be included as a candidate.
+     * Set when the selector explicitly leads with `:scope`.
+     */
+    shouldIncludeRoot?: boolean;
 }
 
 /**

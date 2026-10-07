@@ -85,6 +85,19 @@ export function compileToken<Node, ElementNode extends Node>(
     const finalContext =
         context && (Array.isArray(context) ? context : [context]);
 
+    /*
+     * Whether the selector explicitly leads with `:scope`. In that case the
+     * query root itself is a candidate for matching. Implicit `:scope`
+     * prefixes added by `absolutize` below don't count, so this has to be
+     * determined before absolutizing.
+     */
+    const shouldIncludeRoot = token.some(
+        (rules) =>
+            rules.length > 0 &&
+            rules[0].type === SelectorType.Pseudo &&
+            rules[0].name === "scope",
+    );
+
     // Check if the selector is relative
     if (options.relativeSelector !== false) {
         absolutize(token, options, finalContext);
@@ -150,6 +163,7 @@ export function compileToken<Node, ElementNode extends Node>(
     }
 
     query.shouldTestNextSiblings = shouldTestNextSiblings;
+    query.shouldIncludeRoot = shouldIncludeRoot;
 
     return query;
 }

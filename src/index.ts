@@ -105,6 +105,7 @@ function getSelectorFunction<Node, ElementNode extends Node, T>(
             elements,
             convertedOptions.adapter,
             query.shouldTestNextSiblings,
+            query.shouldIncludeRoot,
         );
         return searchFunction(query, filteredElements, convertedOptions);
     };
@@ -115,12 +116,24 @@ function getSelectorFunction<Node, ElementNode extends Node, T>(
  * @param elements Elements to test against sibling-dependent selectors.
  * @param adapter Adapter implementation used for DOM operations.
  * @param shouldTestNextSiblings Whether sibling combinators should include following siblings.
+ * @param shouldIncludeRoot Whether a single root element should be queried
+ * itself, in addition to its children. Set for selectors that explicitly
+ * lead with `:scope`.
  */
 export function prepareContext<Node, ElementNode extends Node>(
     elements: Node | Node[],
     adapter: Adapter<Node, ElementNode>,
     shouldTestNextSiblings = false,
+    shouldIncludeRoot = false,
 ): Node[] {
+    /*
+     * If the root should be matched itself, treat a single element like an
+     * array of elements, which are queried directly.
+     */
+    if (shouldIncludeRoot && !Array.isArray(elements)) {
+        elements = [elements];
+    }
+
     /*
      * Add siblings if the query requires them.
      * See https://github.com/fb55/css-select/pull/43#issuecomment-225414692
@@ -130,7 +143,11 @@ export function prepareContext<Node, ElementNode extends Node>(
     }
 
     return Array.isArray(elements)
-        ? adapter.removeSubsets(elements)
+        ? /*
+           * `removeSubsets` mutates the passed array; copy it to keep the
+           * caller's array (which may double as the `:scope` context) intact.
+           */
+          adapter.removeSubsets([...elements])
         : adapter.getChildren(elements);
 }
 

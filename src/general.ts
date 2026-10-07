@@ -32,6 +32,44 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
 ): CompiledQuery<ElementNode> {
     const { adapter, equals, cacheResults } = options;
 
+    /*
+     * Ancestor matching must not cross the boundary of the query root(s).
+     * When a context is set (and relative selectors are enabled), ancestor
+     * combinators stop once they reach a context root that isn't nested
+     * below another context root; the root itself is still tested, so
+     * `:scope` keeps working. With `relativeSelector` disabled, selectors
+     * are matched against the whole tree as before.
+     */
+    const isRootBoundary =
+        context && context.length > 0 && options.relativeSelector !== false
+            ? (node: ElementNode): boolean => {
+                  let isRoot = false;
+
+                  for (const root of context) {
+                      if (equals(root, node)) {
+                          isRoot = true;
+                          continue;
+                      }
+
+                      /*
+                       * Roots that are nested below another root are not a
+                       * boundary; the outermost root is.
+                       */
+                      let current = getElementParent(node, adapter);
+
+                      while (current) {
+                          if (equals(current, root)) {
+                              return false;
+                          }
+
+                          current = getElementParent(current, adapter);
+                      }
+                  }
+
+                  return isRoot;
+              }
+            : undefined;
+
     switch (selector.type) {
         case SelectorType.PseudoElement: {
             throw new Error("Pseudo-elements are not supported by css-select");
@@ -95,6 +133,11 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
                         if (next(current)) {
                             return true;
                         }
+
+                        // Don't cross the boundary of the query root.
+                        if (isRootBoundary?.(current)) {
+                            return false;
+                        }
                     }
 
                     return false;
@@ -126,6 +169,11 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
                         }
                         return cached.matches;
                     }
+
+                    // Don't cross the boundary of the query root.
+                    if (isRootBoundary?.(current)) {
+                        return false;
+                    }
                 }
 
                 return false;
@@ -140,6 +188,12 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
                     if (next(current)) {
                         return true;
                     }
+
+                    // Don't cross the boundary of the query root.
+                    if (isRootBoundary?.(current)) {
+                        return false;
+                    }
+
                     current = getElementParent(current, adapter);
                 } while (current);
 
@@ -155,6 +209,11 @@ export function compileGeneralSelector<Node, ElementNode extends Node>(
         }
         case SelectorType.Child: {
             return function child(element: ElementNode): boolean {
+                // The parent of a query root is outside of the root boundary.
+                if (isRootBoundary?.(element)) {
+                    return false;
+                }
+
                 const parent = getElementParent(element, adapter);
                 return parent !== null && next(parent);
             };
