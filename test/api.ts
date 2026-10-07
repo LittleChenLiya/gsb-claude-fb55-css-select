@@ -132,6 +132,118 @@ describe("API", () => {
         });
     });
 
+    describe("root boundaries", () => {
+        /*
+         * Small in-memory DOM: `#root` is the query root, `.inner` and
+         * `.leaf` are its descendants, `body`/`html` are outside of it.
+         */
+        const document = parseDocument(
+            `<html><body><div id="root" class="root"><section class="inner"><p class="leaf">x</p></section></div></body></html>`,
+        );
+        const root = CSSselect.selectOne<AnyNode, Element>("#root", document);
+        const inner = CSSselect.selectOne<AnyNode, Element>(".inner", document);
+        const leaf = CSSselect.selectOne<AnyNode, Element>(".leaf", document);
+
+        if (root === null || inner === null || leaf === null) {
+            throw new Error("Fixture is missing elements");
+        }
+
+        describe("root itself matching", () => {
+            it("should not include the root by default", () => {
+                expect(CSSselect.selectAll(":scope", root)).toHaveLength(0);
+                expect(CSSselect.selectAll("div.root", root)).toHaveLength(0);
+                expect(CSSselect.selectOne(":scope", root)).toBeNull();
+            });
+
+            it("should match the root itself with `includeRoot`", () => {
+                expect(
+                    CSSselect.selectAll(":scope", root, { includeRoot: true }),
+                ).toStrictEqual([root]);
+                expect(
+                    CSSselect.selectAll("div.root", root, {
+                        includeRoot: true,
+                    }),
+                ).toStrictEqual([root]);
+                expect(
+                    CSSselect.selectOne(":scope", root, { includeRoot: true }),
+                ).toBe(root);
+            });
+
+            it("should point `:scope` at the root and include descendants", () => {
+                expect(CSSselect.selectAll(":scope .leaf", root)).toStrictEqual(
+                    [leaf],
+                );
+                expect(
+                    CSSselect.selectAll(":scope .leaf", root, {
+                        includeRoot: true,
+                    }),
+                ).toStrictEqual([leaf]);
+            });
+
+            it("should allow the root as ancestor end point with `includeRoot`", () => {
+                // The root is part of the boundary, but not its own ancestor.
+                expect(CSSselect.selectAll(".root .leaf", root)).toHaveLength(
+                    0,
+                );
+                expect(
+                    CSSselect.selectAll(".root .leaf", root, {
+                        includeRoot: true,
+                    }),
+                ).toStrictEqual([leaf]);
+            });
+        });
+
+        describe("ancestors outside of the root", () => {
+            it("should reject ancestors beyond the root", () => {
+                expect(CSSselect.selectAll("body .leaf", root)).toHaveLength(0);
+                expect(CSSselect.selectAll("html p", root)).toHaveLength(0);
+            });
+
+            it("should still reject outside ancestors with `includeRoot`", () => {
+                expect(
+                    CSSselect.selectAll("body .leaf", root, {
+                        includeRoot: true,
+                    }),
+                ).toHaveLength(0);
+                expect(
+                    CSSselect.selectAll("html p", root, { includeRoot: true }),
+                ).toHaveLength(0);
+            });
+        });
+
+        describe("overlapping roots", () => {
+            it("should return shared nodes only once", () => {
+                expect(CSSselect.selectAll("p", [root, root])).toStrictEqual([
+                    leaf,
+                ]);
+                expect(CSSselect.selectAll("p", [root, inner])).toStrictEqual([
+                    leaf,
+                ]);
+                expect(CSSselect.selectAll("p", [inner, root])).toStrictEqual([
+                    leaf,
+                ]);
+            });
+
+            it("should match every passed root independently", () => {
+                expect(
+                    CSSselect.selectAll(":scope", [root, inner]),
+                ).toStrictEqual([root, inner]);
+                expect(
+                    CSSselect.selectAll(":scope", [inner, root]),
+                ).toStrictEqual([root, inner]);
+                expect(CSSselect.selectAll(":scope", [root, root])).toHaveLength(
+                    1,
+                );
+            });
+
+            it("should not mutate the passed array of roots", () => {
+                const roots: Element[] = [root, inner];
+                expect(CSSselect.selectAll(":scope", roots)).toHaveLength(2);
+                expect(roots).toStrictEqual([root, inner]);
+            });
+        });
+    });
+
     describe("errors", () => {
         it("should throw with a pseudo-element", () => {
             expect(() => CSSselect.compile("::after")).toThrow("not supported");

@@ -143,6 +143,11 @@ All options are optional.
   By default it uses the `domutils` module.
 - `context`: The context of the current query. Used to limit the scope of
   searches. Can be matched directly using the `:scope` pseudo-class.
+- `includeRoot`: Whether the query root itself should be included when
+  matching. By default, querying a single node only tests its descendants.
+  When enabled, the root is tested as well: `:scope` matches the root itself,
+  and ancestor traversal may end at the root (but never crosses it). Roots
+  passed as an array are always included. Default: `false`.
 - `relativeSelector`: By default, selectors are relative to the `context`, which
   means that no parent elements of the context will be matched. (Eg. `a b c`
   with context `b` will never give any results.) If `relativeSelector` is set to

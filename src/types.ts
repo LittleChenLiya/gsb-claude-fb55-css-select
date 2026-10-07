@@ -150,6 +150,19 @@ export interface Options<Node, ElementNode extends Node> {
      */
     context?: Node | Node[];
     /**
+     * Whether the query root itself should be included when matching.
+     *
+     * By default, querying a single node only tests its descendants, and the
+     * root can only be matched by passing it as part of an array. When this is
+     * enabled, the root is tested as well: `:scope` matches the root itself,
+     * and ancestor traversal may end at the root (but never crosses it).
+     *
+     * Roots passed as an array are always included in matching, independent of
+     * this option.
+     * @default false
+     */
+    includeRoot?: boolean;
+    /**
      * Indicates whether to consider the selector as a relative selector.
      *
      * Relative selectors that don't include a `:scope` pseudo-class behave

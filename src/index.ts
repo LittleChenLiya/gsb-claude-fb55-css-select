@@ -105,6 +105,7 @@ function getSelectorFunction<Node, ElementNode extends Node, T>(
             elements,
             convertedOptions.adapter,
             query.shouldTestNextSiblings,
+            convertedOptions.includeRoot ?? false,
         );
         return searchFunction(query, filteredElements, convertedOptions);
     };
@@ -115,11 +116,14 @@ function getSelectorFunction<Node, ElementNode extends Node, T>(
  * @param elements Elements to test against sibling-dependent selectors.
  * @param adapter Adapter implementation used for DOM operations.
  * @param shouldTestNextSiblings Whether sibling combinators should include following siblings.
+ * @param includeRoot Whether a single root node should be tested itself,
+ * instead of only its children. Roots passed as an array are always tested.
  */
 export function prepareContext<Node, ElementNode extends Node>(
     elements: Node | Node[],
     adapter: Adapter<Node, ElementNode>,
     shouldTestNextSiblings = false,
+    includeRoot = false,
 ): Node[] {
     /*
      * Add siblings if the query requires them.
@@ -129,9 +133,17 @@ export function prepareContext<Node, ElementNode extends Node>(
         elements = appendNextSiblings(elements, adapter);
     }
 
-    return Array.isArray(elements)
-        ? adapter.removeSubsets(elements)
-        : adapter.getChildren(elements);
+    if (Array.isArray(elements)) {
+        /*
+         * Copy the array before handing it to `removeSubsets`, which removes
+         * elements in place. The same array may be referenced by the compiled
+         * query (eg. as the `:scope` context) or by the caller, and every
+         * passed root has to be matched independently.
+         */
+        return adapter.removeSubsets([...elements]);
+    }
+
+    return includeRoot ? [elements] : adapter.getChildren(elements);
 }
 
 function appendNextSiblings<Node, ElementNode extends Node>(

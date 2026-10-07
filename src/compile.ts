@@ -80,7 +80,13 @@ export function compileToken<Node, ElementNode extends Node>(
         rootFunc: rootFunction = boolbase.trueFunc,
     } = options;
 
-    const isArrayContext = Array.isArray(context);
+    /*
+     * When the root itself should be included in matching, a single-node
+     * context behaves like an array context: the root becomes a valid end
+     * point for ancestor traversal (without ever being crossed).
+     */
+    const isArrayContext =
+        Array.isArray(context) || (context != null && options.includeRoot === true);
 
     const finalContext =
         context && (Array.isArray(context) ? context : [context]);
