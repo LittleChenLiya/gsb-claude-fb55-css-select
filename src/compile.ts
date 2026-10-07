@@ -8,6 +8,7 @@ import {
     isTraversal,
     sortRules,
 } from "./helpers/selectors.js";
+import { PseudoClassCompileError } from "./pseudo-selectors/errors.js";
 import { PLACEHOLDER_ELEMENT } from "./pseudo-selectors/subselects.js";
 import type {
     CompiledQuery,
@@ -71,6 +72,19 @@ export function compileToken<Node, ElementNode extends Node>(
     options: InternalOptions<Node, ElementNode>,
     compilationContext?: Node[] | Node,
 ): CompiledQuery<ElementNode> {
+    /*
+     * Record the position of each rule within its selector group before
+     * `sortRules` reorders them, so that compile errors can be located in
+     * the selector as written.
+     */
+    const sourcePositions = token.map((rules) => {
+        const positions = new Map<InternalSelector, number>();
+        for (const [index, rule] of rules.entries()) {
+            positions.set(rule, index);
+        }
+        return positions;
+    });
+
     for (const rules of token) {
         sortRules(rules);
     }
@@ -96,8 +110,11 @@ export function compileToken<Node, ElementNode extends Node>(
 
     let shouldTestNextSiblings = false;
     let query: CompiledQuery<ElementNode> = boolbase.falseFunc;
+    let groupIndex = -1;
 
     combineLoop: for (const rules of token) {
+        groupIndex++;
+
         if (rules.length >= 2) {
             const [first, second] = rules;
 
@@ -118,27 +135,46 @@ export function compileToken<Node, ElementNode extends Node>(
 
         let next = rootFunction;
         let hasExpensiveSubselector = false;
+        let currentRule: InternalSelector | undefined;
 
-        for (const rule of rules) {
-            next = compileGeneralSelector(
-                next,
-                rule,
-                options,
-                finalContext,
-                compileToken,
-                hasExpensiveSubselector,
-            );
+        try {
+            for (const rule of rules) {
+                currentRule = rule;
+                next = compileGeneralSelector(
+                    next,
+                    rule,
+                    options,
+                    finalContext,
+                    compileToken,
+                    hasExpensiveSubselector,
+                );
 
-            const quality = getQuality(rule);
+                const quality = getQuality(rule);
 
-            if (quality === 0) {
-                hasExpensiveSubselector = true;
+                if (quality === 0) {
+                    hasExpensiveSubselector = true;
+                }
+
+                // If the sub-selector won't match any elements, skip it.
+                if (next === boolbase.falseFunc) {
+                    continue combineLoop;
+                }
+            }
+        } catch (error) {
+            /*
+             * Locate the failing selector group for custom pseudo-class
+             * compile errors. The error is re-thrown, so no partially
+             * compiled query function can escape and be reused.
+             */
+            if (error instanceof PseudoClassCompileError) {
+                const ruleIndex =
+                    currentRule === undefined
+                        ? -1
+                        : (sourcePositions[groupIndex].get(currentRule) ?? -1);
+                error.locate(groupIndex, ruleIndex);
             }
 
-            // If the sub-selector won't match any elements, skip it.
-            if (next === boolbase.falseFunc) {
-                continue combineLoop;
-            }
+            throw error;
         }
 
         // If we have a function that always returns true, we can stop here.

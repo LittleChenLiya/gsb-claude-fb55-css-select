@@ -223,4 +223,5 @@ export function is<Node, ElementNode extends Node>(
  */
 export default selectAll;
 
+export { PseudoClassCompileError } from "./pseudo-selectors/errors.js";
 export type { Options } from "./types.js";

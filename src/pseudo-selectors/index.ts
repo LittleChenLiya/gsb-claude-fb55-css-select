@@ -16,9 +16,23 @@
 import { type PseudoSelector, parse } from "css-what";
 import type { CompiledQuery, CompileToken, InternalOptions } from "../types.js";
 import { aliases } from "./aliases.js";
+import { PseudoClassCompileError } from "./errors.js";
 import { filters } from "./filters.js";
 import { pseudos, verifyPseudoArguments } from "./pseudos.js";
 import { subselects } from "./subselects.js";
+
+/**
+ * Wrap errors thrown while compiling a custom pseudo-class in a
+ * {@link PseudoClassCompileError}, keeping the original error as `cause`.
+ * Errors that are already wrapped are passed through unchanged.
+ * @param error The error that was thrown.
+ * @param name Name of the custom pseudo-class being compiled.
+ */
+function asPseudoClassCompileError(error: unknown, name: string): Error {
+    return error instanceof PseudoClassCompileError
+        ? error
+        : new PseudoClassCompileError(name, error);
+}
 
 /**
  * Compile a pseudo selector into an executable query function.
@@ -47,8 +61,28 @@ export function compilePseudoSelector<Node, ElementNode extends Node>(
 
     const userPseudo = options.pseudos?.[name];
 
-    const stringPseudo =
-        typeof userPseudo === "string" ? userPseudo : aliases[name];
+    if (typeof userPseudo === "string") {
+        // Custom pseudo-class, defined as an alias for another selector.
+        try {
+            if (data != null) {
+                throw new Error(`Pseudo ${name} doesn't have any arguments`);
+            }
+
+            // The alias has to be parsed here, to make sure options are respected.
+            const alias = parse(userPseudo);
+            return subselects["is"](
+                next,
+                alias,
+                options,
+                context,
+                compileToken,
+            );
+        } catch (error) {
+            throw asPseudoClassCompileError(error, name);
+        }
+    }
+
+    const stringPseudo = aliases[name];
 
     if (typeof stringPseudo === "string") {
         if (data != null) {
@@ -61,7 +95,11 @@ export function compilePseudoSelector<Node, ElementNode extends Node>(
     }
 
     if (typeof userPseudo === "function") {
-        verifyPseudoArguments(userPseudo, name, data, 1);
+        try {
+            verifyPseudoArguments(userPseudo, name, data, 1);
+        } catch (error) {
+            throw asPseudoClassCompileError(error, name);
+        }
 
         return (element) => userPseudo(element, data) && next(element);
     }
@@ -87,5 +125,6 @@ export function compilePseudoSelector<Node, ElementNode extends Node>(
 }
 
 export { aliases } from "./aliases.js";
+export { PseudoClassCompileError } from "./errors.js";
 export { filters } from "./filters.js";
 export { pseudos } from "./pseudos.js";
