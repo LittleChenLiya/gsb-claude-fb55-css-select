@@ -193,6 +193,106 @@ describe("API", () => {
                     },
                 }),
             ).toThrow("requires an argument"));
+
+        describe("custom pseudo-class compile errors", () => {
+            const options = {
+                pseudos: {
+                    foovalue(_element: Element, data?: string | null) {
+                        return data != null;
+                    },
+                    ok: () => true,
+                },
+            };
+
+            const compileError = (
+                selector: string,
+            ): CSSselect.PseudoClassCompilationError => {
+                try {
+                    CSSselect.compile(selector, options);
+                } catch (error) {
+                    return error as CSSselect.PseudoClassCompilationError;
+                }
+                throw new Error("Expected compilation to fail");
+            };
+
+            it("should add pseudo-class name, position and cause", () => {
+                const error = compileError("div:foovalue");
+
+                expect(error).toBeInstanceOf(
+                    CSSselect.PseudoClassCompilationError,
+                );
+                expect(error.pseudoName).toBe("foovalue");
+                expect(error.groupIndex).toBe(0);
+                expect(error.tokenIndex).toBe(1);
+                expect(error.message).toContain(":foovalue");
+                expect(error.message).toContain(
+                    "token 1 of selector group 0",
+                );
+                expect(error.cause).toBeInstanceOf(Error);
+                expect((error.cause as Error).message).toBe(
+                    "Pseudo-class :foovalue requires an argument",
+                );
+            });
+
+            it("should only locate the failing group in grouped selectors", () => {
+                const error = compileError("p:ok, span:foovalue");
+
+                expect(error).toBeInstanceOf(
+                    CSSselect.PseudoClassCompilationError,
+                );
+                expect(error.pseudoName).toBe("foovalue");
+                expect(error.groupIndex).toBe(1);
+                expect(error.tokenIndex).toBe(1);
+            });
+
+            it("should surface the error through the query API", () => {
+                let caught: unknown;
+                try {
+                    CSSselect.selectAll("div:foovalue", [dom], options);
+                } catch (error) {
+                    caught = error;
+                }
+
+                expect(caught).toBeInstanceOf(
+                    CSSselect.PseudoClassCompilationError,
+                );
+                expect(
+                    (caught as CSSselect.PseudoClassCompilationError)
+                        .pseudoName,
+                ).toBe("foovalue");
+            });
+
+            it("should not wrap unknown pseudo-class errors", () => {
+                let caught: unknown;
+                try {
+                    CSSselect.compile("div:unmatched", options);
+                } catch (error) {
+                    caught = error;
+                }
+
+                expect(caught).toBeInstanceOf(Error);
+                expect(caught).not.toBeInstanceOf(
+                    CSSselect.PseudoClassCompilationError,
+                );
+                expect((caught as Error).message).toBe(
+                    "Unknown pseudo-class :unmatched",
+                );
+                expect((caught as Error).cause).toBeUndefined();
+            });
+
+            it("should not leave a reusable function behind after a failed compilation", () => {
+                // The first group compiles fine, the second one fails.
+                expect(() =>
+                    CSSselect.compile("p:ok, div:foovalue", options),
+                ).toThrow(CSSselect.PseudoClassCompilationError);
+
+                // A subsequent valid compilation with the same options works.
+                const query = CSSselect.compile("p:ok", options);
+                expect(CSSselect.selectAll(query, [dom])).toStrictEqual(
+                    CSSselect.selectAll("p", [dom]),
+                );
+            });
+        });
     });
 
     describe("unsatisfiable and universally valid selectors", () => {
